@@ -183,6 +183,8 @@ export function startServer(config, state) {
   // SPA fallback — serve index.html for all non-API/non-file routes
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return res.status(404).json({ error: 'Not found' });
+    // Don't serve index.html for requests with a file extension (e.g. .png, .js, .css)
+    if (path.extname(req.path)) return res.status(404).end();
     res.sendFile(path.join(publicDir, 'index.html'));
   });
 
