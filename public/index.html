@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BuhritBets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <!-- ═══ NAV ═══ -->
+  <nav class="nav" id="nav">
+    <a class="nav-logo" href="#/" onclick="route(event, '/')">BuhritBets</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <!-- ═══ MAIN CONTENT (SPA pages render here) ═══ -->
+  <main id="app"></main>
+
+  <!-- ═══ TOAST CONTAINER ═══ -->
+  <div class="toast-container" id="toasts"></div>
+
+  <!-- ═══ MODAL OVERLAY ═══ -->
+  <div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal-content" id="modalContent" onclick="event.stopPropagation()"></div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
