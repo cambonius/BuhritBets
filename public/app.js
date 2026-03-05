@@ -294,7 +294,7 @@ function pageLanding() {
   $app().innerHTML = `
     <div class="hero">
       <h1 class="t-display">Bet on the stream.<br>Win the points.</h1>
-      <p class="hero-sub t-body">Predict when Buhrito goes live. Challenge other viewers. All for bragging rights (and holding our favorite streamer accountable :buhritWholesome:).</p>
+      <p class="hero-sub t-body">Predict when Buhrito goes live. Challenge other viewers. All for bragging rights (and holding our favorite streamer accountable yayy :buhritWholesome:).</p>
       <div class="hero-cta">
         <button class="btn btn-primary" onclick="route(event, '/signup')">Sign Up — It's Free</button>
         <button class="btn btn-secondary" onclick="route(event, '/login')">Log In</button>
