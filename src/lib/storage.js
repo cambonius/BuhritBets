@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const dataDir = path.resolve(process.cwd(), 'data');
+const dataDir = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
 const eventsFile = path.join(dataDir, 'events.jsonl');
 const tokenFile = path.join(dataDir, 'token.json');
 

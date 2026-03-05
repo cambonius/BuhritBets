@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 
-const dbPath = path.resolve(process.cwd(), 'data', 'buhritbets.db');
+const dataDir = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
+const dbPath = path.join(dataDir, 'buhritbets.db');
 
 let _db;
 export function getDb() {

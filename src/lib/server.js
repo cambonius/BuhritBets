@@ -40,7 +40,8 @@ export function startServer(config, state) {
   app.use(express.static(publicDir));
 
   // Serve uploaded avatars
-  const uploadsDir = path.resolve(process.cwd(), 'data', 'uploads');
+  const dataDir = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
+  const uploadsDir = path.join(dataDir, 'uploads');
   app.use('/uploads', express.static(uploadsDir));
 
   // Resolve function set by index.js once auth completes

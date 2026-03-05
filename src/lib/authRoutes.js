@@ -9,7 +9,8 @@ import { createUser, getUserByLogin, getUserById, updateUserAvatar } from './db.
 const router = Router();
 
 // ── Avatar upload setup ──────────────────────────────────
-const uploadsDir = path.resolve(process.cwd(), 'data', 'uploads');
+const dataDir = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
+const uploadsDir = path.join(dataDir, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const avatarStorage = multer.diskStorage({
