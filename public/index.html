@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0E0E10">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="/buhritWholesomeFavicon.png">
+  <link rel="apple-touch-icon" href="/buhritWholesomeFavicon.png">
   <title>BuhritBets</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +15,7 @@
 </head>
 <body>
 
-  <!-- ═══ NAV ═══ -->
+  <!-- ═══ TOP NAV (desktop) ═══ -->
   <nav class="nav" id="nav">
     <a class="nav-logo" href="#/" onclick="route(event, '/')">BuhritBets</a>
     <div class="nav-links" id="navLinks"></div>
@@ -19,6 +23,9 @@
 
   <!-- ═══ MAIN CONTENT (SPA pages render here) ═══ -->
   <main id="app"></main>
+
+  <!-- ═══ BOTTOM NAV (mobile) ═══ -->
+  <nav class="bottom-nav" id="bottomNav"></nav>
 
   <!-- ═══ TOAST CONTAINER ═══ -->
   <div class="toast-container" id="toasts"></div>

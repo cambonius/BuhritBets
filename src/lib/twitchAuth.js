@@ -19,12 +19,14 @@ export async function getAppAccessToken(config) {
 
 // --- User Access Token (required for EventSub WebSocket) ---
 
-const REDIRECT_URI = 'http://localhost:3000/auth/twitch/callback';
+function getRedirectUri(config) {
+  return `${config.http.baseUrl}/auth/twitch/callback`;
+}
 
 export function getAuthorizeUrl(config) {
   const url = new URL('https://id.twitch.tv/oauth2/authorize');
   url.searchParams.set('client_id', config.twitch.clientId);
-  url.searchParams.set('redirect_uri', REDIRECT_URI);
+  url.searchParams.set('redirect_uri', getRedirectUri(config));
   url.searchParams.set('response_type', 'code');
   // No special scopes needed for stream.online / stream.offline
   url.searchParams.set('scope', '');
@@ -37,7 +39,7 @@ export async function exchangeCode(config, code) {
   url.searchParams.set('client_secret', config.twitch.clientSecret);
   url.searchParams.set('code', code);
   url.searchParams.set('grant_type', 'authorization_code');
-  url.searchParams.set('redirect_uri', REDIRECT_URI);
+  url.searchParams.set('redirect_uri', getRedirectUri(config));
 
   const res = await fetch(url, { method: 'POST' });
   if (!res.ok) {

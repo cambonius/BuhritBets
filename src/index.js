@@ -18,6 +18,31 @@ const serverState = {
 
 startServer(config, serverState);
 
+// ── Live status check (uses app token, no user auth needed) ──
+async function checkLiveStatus() {
+  try {
+    const appToken = await getAppAccessToken(config);
+    const logins = (config.broadcasters.logins || []);
+    const ids = (config.broadcasters.ids || []);
+    const streams = await helixGetStreams({ config, token: appToken, userLogins: logins, userIds: ids });
+    if (streams.length > 0 && streams[0].type === 'live') {
+      serverState.eventSub.isLive = true;
+      serverState.eventSub.lastLiveAt = streams[0].started_at;
+      console.log(`[poll] Buhrito is LIVE (started at ${streams[0].started_at})`);
+    } else {
+      serverState.eventSub.isLive = false;
+      console.log('[poll] Buhrito is OFFLINE');
+    }
+  } catch (e) {
+    console.error('[poll] Could not check live status:', e?.message || e);
+  }
+}
+
+// Check immediately on startup
+await checkLiveStatus();
+// Poll every 60s as fallback (in case EventSub is disconnected)
+setInterval(checkLiveStatus, 60_000);
+
 // Try to load a saved user token; if none, prompt browser auth
 let userToken = await getUserAccessToken(config);
 
@@ -46,24 +71,6 @@ if (!userToken) {
 }
 
 console.log('[auth] user token ready');
-
-// Check if Buhrito is already live before EventSub connects
-try {
-  const appToken = await getAppAccessToken(config);
-  const logins = (config.broadcasters.logins || []);
-  const ids = (config.broadcasters.ids || []);
-  const streams = await helixGetStreams({ config, token: appToken, userLogins: logins, userIds: ids });
-  if (streams.length > 0 && streams[0].type === 'live') {
-    serverState.eventSub.isLive = true;
-    serverState.eventSub.lastLiveAt = streams[0].started_at;
-    console.log(`[startup] Buhrito is LIVE (started at ${streams[0].started_at})`);
-  } else {
-    serverState.eventSub.isLive = false;
-    console.log('[startup] Buhrito is OFFLINE');
-  }
-} catch (e) {
-  console.error('[startup] Could not check live status:', e?.message || e);
-}
 
 await startEventSub({
   config,

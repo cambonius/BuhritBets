@@ -172,7 +172,8 @@ async function router() {
     if (handler) await handler();
     else await pageLanding();
   }
-  // Post-render: convert all :emoteName: text nodes into inline emote images
+  // Post-render: update bottom nav active state & convert emotes
+  renderBottomNav();
   applyEmotes($app());
 }
 
@@ -201,6 +202,44 @@ function renderNav() {
       <button class="btn btn-secondary btn-sm" onclick="route(event, '/login')">Log In</button>
       <button class="btn btn-primary btn-sm" onclick="route(event, '/signup')">Sign Up</button>
     `;
+  }
+  renderBottomNav();
+}
+
+// ── Bottom nav (mobile) ──────────────────────────────────
+function renderBottomNav() {
+  const el = $('#bottomNav');
+  if (!el) return;
+  const hash = getHash();
+
+  if (currentUser) {
+    const items = [
+      { icon: '🏠', label: 'Home',    path: '/dashboard' },
+      { icon: '🏆', label: 'Ranks',   path: '/leaderboard' },
+      { icon: '➕', label: 'Bet',     path: '/bets/create', cls: 'bnav-create' },
+      { icon: '📡', label: 'Status',  path: '/status' },
+      { icon: '👤', label: 'Profile', path: '/profile' },
+    ];
+    el.innerHTML = items.map(it => {
+      const active = hash === it.path ? ' active' : '';
+      const extra = it.cls ? ` ${it.cls}` : '';
+      return `<a href="#${it.path}" onclick="route(event,'${it.path}')" class="bottom-nav-item${active}${extra}">
+        <span class="bnav-icon">${it.icon}</span><span class="bnav-label">${it.label}</span>
+      </a>`;
+    }).join('');
+  } else {
+    const items = [
+      { icon: '🏠', label: 'Home',   path: '/' },
+      { icon: '📡', label: 'Status', path: '/status' },
+      { icon: '🔑', label: 'Log In', path: '/login' },
+      { icon: '✏️', label: 'Sign Up', path: '/signup' },
+    ];
+    el.innerHTML = items.map(it => {
+      const active = hash === it.path ? ' active' : '';
+      return `<a href="#${it.path}" onclick="route(event,'${it.path}')" class="bottom-nav-item${active}">
+        <span class="bnav-icon">${it.icon}</span><span class="bnav-label">${it.label}</span>
+      </a>`;
+    }).join('');
   }
 }
 
