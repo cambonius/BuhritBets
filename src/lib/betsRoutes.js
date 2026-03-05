@@ -11,7 +11,7 @@ const router = Router();
 // ── Create bet ───────────────────────────────────────────
 router.post('/api/bets', requireAuth, (req, res) => {
   try {
-    const { condition, targetTime, stake, note } = req.body;
+    const { condition, targetTime, stake, note, title } = req.body;
     if (!condition || !targetTime || !stake) {
       return res.status(400).json({ error: 'Condition, targetTime, and stake are required.' });
     }
@@ -28,6 +28,7 @@ router.post('/api/bets', requireAuth, (req, res) => {
 
     const bet = createBet({
       creatorId: req.session.userId,
+      title: title ? String(title).slice(0, 60) : null,
       condition,
       targetTime: target.toISOString(),
       stake: Number(stake),

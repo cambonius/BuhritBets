@@ -267,6 +267,14 @@ async function refreshStatus() {
   } catch { /* ignore */ }
 }
 
+// ── Avatar helper ────────────────────────────────────────
+function avatarHTML(user, size = 48) {
+  if (user?.avatar_path) {
+    return `<img class="avatar" src="${esc(user.avatar_path)}" alt="${esc(user.username)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover">`;
+  }
+  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px">${(user?.username || '?').charAt(0).toUpperCase()}</div>`;
+}
+
 // ── Status Banner Component ──────────────────────────────
 function statusBannerHTML() {
   const live = streamerStatus.isLive;
@@ -533,6 +541,7 @@ function betCardHTML(b) {
       <div class="bet-card">
         <span class="badge ${badgeClass(b.status, b.winner_id)}">${badgeLabel(b.status, b.winner_id)}</span>
         <div class="bet-info">
+          ${b.title ? `<div class="bet-title">${esc(b.title)}</div>` : ''}
           <div class="bet-condition">${conditionText(b.condition)} ${fmtDate(b.target_time)}</div>
           <div class="bet-meta">@${esc(b.creator_username)} · Stake: 🪙 ${b.stake}${b.opponent_username ? ` · vs @${esc(b.opponent_username)}` : ''}</div>
           ${b.note ? `<div class="bet-note">${emoteify(esc(b.note))}</div>` : ''}
@@ -594,6 +603,12 @@ function pageCreateBet() {
         </div>
 
         <form id="createBetForm" class="flex flex-col gap-lg">
+          <!-- Title -->
+          <div class="form-group">
+            <label class="form-label">Bet name <span class="t-caption">(optional)</span></label>
+            <input class="form-input" type="text" id="cb-title" maxlength="60" placeholder="e.g. Monday Night Stream">
+          </div>
+
           <!-- Time -->
           <div class="form-group">
             <label class="form-label">When will Buhrito go live?</label>
@@ -725,7 +740,8 @@ function pageCreateBet() {
           condition: selectedCond,
           targetTime: new Date($('#cb-time').value).toISOString(),
           stake: Number($('#cb-stake').value),
-          note: $('#cb-note').value || null
+          note: $('#cb-note').value || null,
+          title: $('#cb-title').value || null
         })
       });
       await refreshUser();
@@ -764,7 +780,7 @@ async function pageBetDetail(id) {
             <span class="badge ${badgeClass(b.status, b.winner_id)}" style="font-size:0.857rem;padding:6px 14px;">
               ${badgeLabel(b.status, b.winner_id)}
             </span>
-            <h1 class="t-h1">${conditionText(b.condition)} ${fmtDate(b.target_time)}</h1>
+            <h1 class="t-h1">${b.title ? esc(b.title) : conditionText(b.condition) + ' ' + fmtDate(b.target_time)}</h1>
           </div>
           <div class="t-caption mb-md">${fmtUTC(b.target_time)} · Created ${fmtDateFull(b.created_at)}</div>
 
@@ -849,7 +865,11 @@ async function pageProfile() {
     <div class="page container-sm">
       <!-- Profile Card -->
       <div class="card card-padded flex items-center gap-lg" style="flex-wrap:wrap">
-        <div class="avatar">${currentUser.username.charAt(0).toUpperCase()}</div>
+        <div class="avatar-wrapper" id="avatarWrapper" style="position:relative;cursor:pointer" title="Change avatar">
+          ${avatarHTML(currentUser, 64)}
+          <div class="avatar-overlay">📷</div>
+        </div>
+        <input type="file" id="avatarInput" accept="image/*" style="display:none">
         <div>
           <h1 class="t-h1">@${esc(currentUser.username)}</h1>
           <div class="t-caption">Member since ${fmtDate(currentUser.created_at)}</div>
@@ -901,6 +921,26 @@ async function pageProfile() {
       attachBetActions();
     }
   } catch { $('#myBetsList').innerHTML = '<div class="empty-state">Failed to load.</div>'; }
+
+  // Avatar upload wiring
+  const avatarWrapper = $('#avatarWrapper');
+  const avatarInput   = $('#avatarInput');
+  if (avatarWrapper && avatarInput) {
+    avatarWrapper.addEventListener('click', () => avatarInput.click());
+    avatarInput.addEventListener('change', async () => {
+      const file = avatarInput.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append('avatar', file);
+      try {
+        const res = await fetch('/api/auth/avatar', { method: 'POST', body: form });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Upload failed');
+        await refreshUser();
+        pageProfile();
+      } catch (err) { alert(err.message); }
+    });
+  }
 }
 
 // ── System Status ────────────────────────────────────────
@@ -981,7 +1021,7 @@ async function pageLeaderboard() {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-md">
                     <div class="t-h2" style="color:var(--text-muted);width:32px;text-align:right">#${i + 1}</div>
-                    <div class="avatar" style="width:40px;height:40px;font-size:1rem">${u.username.charAt(0).toUpperCase()}</div>
+                    ${avatarHTML(u, 40)}
                     <div>
                       <div class="t-body"><strong>@${esc(u.username)}</strong></div>
                       <div class="t-caption">Joined ${fmtDate(u.created_at)}</div>

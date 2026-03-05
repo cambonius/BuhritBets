@@ -22,6 +22,7 @@ function initSchema(db) {
       email TEXT UNIQUE NOT NULL COLLATE NOCASE,
       password_hash TEXT NOT NULL,
       points INTEGER NOT NULL DEFAULT 1000,
+      avatar_path TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -29,6 +30,7 @@ function initSchema(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       creator_id INTEGER NOT NULL REFERENCES users(id),
       opponent_id INTEGER REFERENCES users(id),
+      title TEXT,
       condition TEXT NOT NULL CHECK (condition IN ('BEFORE','AT','AFTER')),
       target_time TEXT NOT NULL,
       stake INTEGER NOT NULL CHECK (stake >= 50),
@@ -55,6 +57,17 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_bets_opponent ON bets(opponent_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
   `);
+
+  // ── Migrations for existing databases ──────────────────
+  const cols = db.prepare("PRAGMA table_info(bets)").all().map(c => c.name);
+  if (!cols.includes('title')) {
+    db.exec("ALTER TABLE bets ADD COLUMN title TEXT");
+  }
+
+  const userCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+  if (!userCols.includes('avatar_path')) {
+    db.exec("ALTER TABLE users ADD COLUMN avatar_path TEXT");
+  }
 }
 
 // ── User helpers ─────────────────────────────────────────
@@ -69,13 +82,18 @@ export function createUser({ username, email, passwordHash }) {
 }
 
 export function getUserById(id) {
-  return getDb().prepare('SELECT id, username, email, points, created_at FROM users WHERE id = ?').get(id);
+  return getDb().prepare('SELECT id, username, email, points, avatar_path, created_at FROM users WHERE id = ?').get(id);
 }
 
 export function getUserByLogin(login) {
   return getDb().prepare(
     'SELECT * FROM users WHERE username = ? OR email = ?'
   ).get(login, login);
+}
+
+export function updateUserAvatar(userId, avatarPath) {
+  getDb().prepare('UPDATE users SET avatar_path = ? WHERE id = ?').run(avatarPath, userId);
+  return getUserById(userId);
 }
 
 // ── Points helpers ───────────────────────────────────────
@@ -96,15 +114,15 @@ export function getUserTransactions(userId, limit = 50) {
 
 // ── Bet helpers ──────────────────────────────────────────
 
-export function createBet({ creatorId, condition, targetTime, stake, note }) {
+export function createBet({ creatorId, title, condition, targetTime, stake, note }) {
   const db = getDb();
   const user = getUserById(creatorId);
   if (!user || user.points < stake) throw new Error('Insufficient points');
 
   const create = db.transaction(() => {
     const info = db.prepare(
-      'INSERT INTO bets (creator_id, condition, target_time, stake, note) VALUES (?, ?, ?, ?, ?)'
-    ).run(creatorId, condition, targetTime, stake, note || null);
+      'INSERT INTO bets (creator_id, title, condition, target_time, stake, note) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(creatorId, title || null, condition, targetTime, stake, note || null);
 
     adjustPoints(creatorId, -stake, 'bet_placed', `Placed bet #${info.lastInsertRowid}`, info.lastInsertRowid);
     return info.lastInsertRowid;
@@ -233,18 +251,41 @@ export function settleBets(actualLiveTimeIso) {
 
       console.log(`[bets] settled bet #${bet.id}: winner=${winnerId} (${conditionMet ? 'creator' : 'opponent'}), payout=${payout}`);
     }
+
+    // Immediately resolve open BEFORE bets whose target time hasn't passed yet
+    // (creator was correct — stream went live before target). Refund their stake.
+    const openBefore = db.prepare(
+      "SELECT * FROM bets WHERE status = 'open' AND condition = 'BEFORE'"
+    ).all();
+
+    for (const bet of openBefore) {
+      const target = new Date(bet.target_time);
+      if (liveTime.getTime() < target.getTime()) {
+        db.prepare(`
+          UPDATE bets SET status = 'settled', winner_id = ?, actual_live_time = ?, settled_at = datetime('now')
+          WHERE id = ?
+        `).run(bet.creator_id, actualLiveTimeIso, bet.id);
+
+        adjustPoints(bet.creator_id, bet.stake, 'bet_won', `Won unmatched BEFORE bet #${bet.id}`, bet.id);
+
+        console.log(`[bets] auto-settled open BEFORE bet #${bet.id}: creator ${bet.creator_id} refunded ${bet.stake}`);
+      }
+    }
   });
 
-  const count = matched.length;
-  if (count > 0) {
+  const openBeforeCount = db.prepare(
+    "SELECT COUNT(*) AS cnt FROM bets WHERE status = 'open' AND condition = 'BEFORE'"
+  ).get().cnt;
+  const count = matched.length + openBeforeCount;
+  if (matched.length > 0 || openBeforeCount > 0) {
     doSettle();
-    console.log(`[bets] settled ${count} bets at live time ${actualLiveTimeIso}`);
+    console.log(`[bets] settled ${matched.length} matched + auto-resolved open BEFORE bets at live time ${actualLiveTimeIso}`);
   }
   return count;
 }
 
 export function getLeaderboard(limit = 20) {
   return getDb().prepare(`
-    SELECT id, username, points, created_at FROM users ORDER BY points DESC LIMIT ?
+    SELECT id, username, points, avatar_path, created_at FROM users ORDER BY points DESC LIMIT ?
   `).all(limit);
 }

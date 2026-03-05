@@ -39,6 +39,10 @@ export function startServer(config, state) {
   // Serve the dashboard HTML
   app.use(express.static(publicDir));
 
+  // Serve uploaded avatars
+  const uploadsDir = path.resolve(process.cwd(), 'data', 'uploads');
+  app.use('/uploads', express.static(uploadsDir));
+
   // Resolve function set by index.js once auth completes
   let authResolve = null;
   state._waitForAuth = () => new Promise((resolve) => { authResolve = resolve; });
