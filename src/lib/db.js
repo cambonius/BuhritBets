@@ -19,9 +19,10 @@ function initSchema(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      twitch_id TEXT UNIQUE NOT NULL,
       username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-      email TEXT UNIQUE NOT NULL COLLATE NOCASE,
-      password_hash TEXT NOT NULL,
+      email TEXT COLLATE NOCASE,
+      password_hash TEXT,
       points INTEGER NOT NULL DEFAULT 1000,
       avatar_path TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -69,27 +70,35 @@ function initSchema(db) {
   if (!userCols.includes('avatar_path')) {
     db.exec("ALTER TABLE users ADD COLUMN avatar_path TEXT");
   }
+  if (!userCols.includes('twitch_id')) {
+    db.exec("ALTER TABLE users ADD COLUMN twitch_id TEXT UNIQUE");
+  }
 }
 
 // ── User helpers ─────────────────────────────────────────
 
-export function createUser({ username, email, passwordHash }) {
+export function createOrUpdateTwitchUser({ twitchId, username, email, avatarUrl }) {
   const db = getDb();
+  const existing = db.prepare('SELECT * FROM users WHERE twitch_id = ?').get(twitchId);
+  if (existing) {
+    db.prepare(
+      'UPDATE users SET username = ?, email = ?, avatar_path = ? WHERE twitch_id = ?'
+    ).run(username, email || null, avatarUrl || existing.avatar_path, twitchId);
+    return getUserByTwitchId(twitchId);
+  }
   const stmt = db.prepare(
-    'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
+    'INSERT INTO users (twitch_id, username, email, avatar_path) VALUES (?, ?, ?, ?)'
   );
-  const info = stmt.run(username, email, passwordHash);
+  const info = stmt.run(twitchId, username, email || null, avatarUrl || null);
   return getUserById(info.lastInsertRowid);
 }
 
 export function getUserById(id) {
-  return getDb().prepare('SELECT id, username, email, points, avatar_path, created_at FROM users WHERE id = ?').get(id);
+  return getDb().prepare('SELECT id, twitch_id, username, email, points, avatar_path, created_at FROM users WHERE id = ?').get(id);
 }
 
-export function getUserByLogin(login) {
-  return getDb().prepare(
-    'SELECT * FROM users WHERE username = ? OR email = ?'
-  ).get(login, login);
+export function getUserByTwitchId(twitchId) {
+  return getDb().prepare('SELECT id, twitch_id, username, email, points, avatar_path, created_at FROM users WHERE twitch_id = ?').get(twitchId);
 }
 
 export function updateUserAvatar(userId, avatarPath) {

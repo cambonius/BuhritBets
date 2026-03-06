@@ -151,7 +151,6 @@ function getHash() {
 
 const routes = {
   '/': pageLanding,
-  '/signup': pageSignup,
   '/login': pageLogin,
   '/dashboard': pageDashboard,
   '/bets/create': pageCreateBet,
@@ -199,8 +198,7 @@ function renderNav() {
   } else {
     nav.innerHTML = `
       <a href="#/status" onclick="route(event, '/status')">Status</a>
-      <button class="btn btn-secondary btn-sm" onclick="route(event, '/login')">Log In</button>
-      <button class="btn btn-primary btn-sm" onclick="route(event, '/signup')">Sign Up</button>
+      <button class="btn btn-primary btn-sm" onclick="window.location.href='/api/auth/twitch'">Log in with Twitch</button>
     `;
   }
   renderBottomNav();
@@ -232,10 +230,14 @@ function renderBottomNav() {
       { icon: '🏠', label: 'Home',   path: '/' },
       { icon: '📡', label: 'Status', path: '/status' },
       { icon: '🔑', label: 'Log In', path: '/login' },
-      { icon: '✏️', label: 'Sign Up', path: '/signup' },
     ];
     el.innerHTML = items.map(it => {
       const active = hash === it.path ? ' active' : '';
+      if (it.path === '/login') {
+        return `<a href="/api/auth/twitch" class="bottom-nav-item${active}">
+          <span class="bnav-icon">${it.icon}</span><span class="bnav-label">${it.label}</span>
+        </a>`;
+      }
       return `<a href="#${it.path}" onclick="route(event,'${it.path}')" class="bottom-nav-item${active}">
         <span class="bnav-icon">${it.icon}</span><span class="bnav-label">${it.label}</span>
       </a>`;
@@ -270,7 +272,7 @@ async function refreshStatus() {
 // ── Avatar helper ────────────────────────────────────────
 function avatarHTML(user, size = 48) {
   if (user?.avatar_path) {
-    return `<img class="avatar" src="${esc(user.avatar_path)}" alt="${esc(user.username)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover">`;
+    return `<img class="avatar" src="${esc(user.avatar_path)}" alt="${esc(user.username)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer">`;
   }
   return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px">${(user?.username || '?').charAt(0).toUpperCase()}</div>`;
 }
@@ -302,10 +304,9 @@ function pageLanding() {
   $app().innerHTML = `
     <div class="hero">
       <h1 class="t-display">Bet on the stream.<br>Win the points.</h1>
-      <p class="hero-sub t-body">Predict when Buhrito goes live. Challenge other viewers. All for bragging rights (and holding our favorite streamer accountable yayy :buhritWholesome:).</p>
+      <p class="hero-sub t-body">Predict when Buhrito goes live. Challenge other viewers. All for bragging rights (and holding our favorite streamer accountable yayy :buhritWholesome:). Log in with your Twitch account to get started!</p>
       <div class="hero-cta">
-        <button class="btn btn-primary" onclick="route(event, '/signup')">Sign Up — It's Free</button>
-        <button class="btn btn-secondary" onclick="route(event, '/login')">Log In</button>
+        <button class="btn btn-primary" onclick="window.location.href='/api/auth/twitch'">Log in with Twitch</button>
       </div>
       <p class="hero-note">Everyone starts with 1,000 points. No real money.</p>
     </div>
@@ -338,100 +339,27 @@ function pageLanding() {
   `;
 }
 
-// ── Sign Up ──────────────────────────────────────────────
-function pageSignup() {
-  $app().innerHTML = `
-    <div class="page container-xs">
-      <div class="auth-card flex flex-col gap-lg">
-        <h1 class="t-h1 text-center">Create your account</h1>
-        <form id="signupForm" class="flex flex-col gap-md">
-          <div class="form-group">
-            <label class="form-label" for="su-user">Username</label>
-            <input class="form-input" id="su-user" type="text" placeholder="3–20 chars, letters & numbers" required minlength="3" maxlength="20" autocomplete="username">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="su-email">Email</label>
-            <input class="form-input" id="su-email" type="email" placeholder="you@example.com" required autocomplete="email">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="su-pass">Password</label>
-            <input class="form-input" id="su-pass" type="password" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="su-pass2">Confirm Password</label>
-            <input class="form-input" id="su-pass2" type="password" placeholder="Repeat password" required minlength="8" autocomplete="new-password">
-          </div>
-          <div class="form-error hidden" id="su-error"></div>
-          <button class="btn btn-primary btn-full" type="submit">Create Account</button>
-        </form>
-        <p class="t-caption text-center">Already have an account? <a href="#/login" onclick="route(event, '/login')">Log in</a></p>
-      </div>
-    </div>
-  `;
-  $('#signupForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const errEl = $('#su-error');
-    errEl.classList.add('hidden');
-    const pass = $('#su-pass').value;
-    const pass2 = $('#su-pass2').value;
-    if (pass !== pass2) { errEl.textContent = 'Passwords don\'t match.'; errEl.classList.remove('hidden'); return; }
-    try {
-      const data = await api('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ username: $('#su-user').value, email: $('#su-email').value, password: pass })
-      });
-      currentUser = data.user;
-      renderNav();
-      route(null, '/dashboard');
-      toast('Welcome to BuhritBets! You start with 🪙 1,000 points.', 'success');
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.classList.remove('hidden');
-    }
-  });
-}
+// ── Sign Up (removed — Twitch OAuth only) ───────────────
 
 // ── Log In ───────────────────────────────────────────────
 function pageLogin() {
+  // Check for error from OAuth callback
+  const params = new URLSearchParams(location.hash.split('?')[1] || '');
+  const error = params.get('error');
+
   $app().innerHTML = `
     <div class="page container-xs">
       <div class="auth-card flex flex-col gap-lg">
-        <h1 class="t-h1 text-center">Welcome back</h1>
-        <form id="loginForm" class="flex flex-col gap-md">
-          <div class="form-group">
-            <label class="form-label" for="li-login">Username or Email</label>
-            <input class="form-input" id="li-login" type="text" required autocomplete="username">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="li-pass">Password</label>
-            <input class="form-input" id="li-pass" type="password" required autocomplete="current-password">
-          </div>
-          <div class="form-error hidden" id="li-error"></div>
-          <button class="btn btn-primary btn-full" type="submit">Log In</button>
-        </form>
-        <p class="t-caption text-center"><a href="#" onclick="event.preventDefault(); toast('Password reset coming soon.', 'info')">Forgot password?</a></p>
-        <p class="t-caption text-center">Don't have an account? <a href="#/signup" onclick="route(event, '/signup')">Sign up</a></p>
+        <h1 class="t-h1 text-center">Log in to BuhritBets</h1>
+        <p class="t-body text-center">Connect your Twitch account to start betting.</p>
+        ${error ? `<div class="form-error">${esc(error)}</div>` : ''}
+        <button class="btn btn-primary btn-full" onclick="window.location.href='/api/auth/twitch'">
+          <span style="font-size:1.2em">📺</span> Log in with Twitch
+        </button>
+        <p class="t-caption text-center">New users automatically get 🪙 1,000 points.</p>
       </div>
     </div>
   `;
-  $('#loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const errEl = $('#li-error');
-    errEl.classList.add('hidden');
-    try {
-      const data = await api('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ login: $('#li-login').value, password: $('#li-pass').value })
-      });
-      currentUser = data.user;
-      renderNav();
-      route(null, '/dashboard');
-      toast('Welcome back!', 'success');
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.classList.remove('hidden');
-    }
-  });
 }
 
 // ── Dashboard ────────────────────────────────────────────

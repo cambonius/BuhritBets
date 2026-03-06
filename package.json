@@ -12,7 +12,6 @@
     "resolve": "node src/resolve-user.js"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",

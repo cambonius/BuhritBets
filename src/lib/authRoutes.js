@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { createUser, getUserByLogin, getUserById, updateUserAvatar } from './db.js';
+import { createOrUpdateTwitchUser, getUserById, updateUserAvatar } from './db.js';
+import { config } from './config.js';
 
 const router = Router();
 
@@ -31,53 +31,72 @@ const avatarUpload = multer({
   }
 });
 
-// ── Register ─────────────────────────────────────────────
-router.post('/api/auth/register', async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required.' });
-    }
-    if (username.length < 3 || username.length > 20 || !/^[a-zA-Z0-9_]+$/.test(username)) {
-      return res.status(400).json({ error: 'Username must be 3–20 characters, letters, numbers, and underscores only.' });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
-    }
+// ── Twitch OAuth Login ───────────────────────────────────
+function getUserRedirectUri() {
+  return `${config.http.baseUrl}/api/auth/twitch/callback`;
+}
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = createUser({ username, email, passwordHash });
-    req.session.userId = user.id;
-    res.json({ ok: true, user });
-  } catch (e) {
-    if (e?.message?.includes('UNIQUE constraint')) {
-      const msg = e.message.includes('username') ? 'Username already taken.' : 'Email already registered.';
-      return res.status(409).json({ error: msg });
-    }
-    console.error('[auth] register error:', e);
-    res.status(500).json({ error: 'Registration failed.' });
-  }
+router.get('/api/auth/twitch', (req, res) => {
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.oauthState = state;
+  const url = new URL('https://id.twitch.tv/oauth2/authorize');
+  url.searchParams.set('client_id', config.twitch.clientId);
+  url.searchParams.set('redirect_uri', getUserRedirectUri());
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', 'user:read:email');
+  url.searchParams.set('state', state);
+  res.redirect(url.toString());
 });
 
-// ── Login ────────────────────────────────────────────────
-router.post('/api/auth/login', async (req, res) => {
+router.get('/api/auth/twitch/callback', async (req, res) => {
   try {
-    const { login, password } = req.body;
-    if (!login || !password) {
-      return res.status(400).json({ error: 'Username/email and password are required.' });
+    const { code, state } = req.query;
+    if (!code) return res.status(400).send('Missing code from Twitch.');
+    if (!state || state !== req.session.oauthState) {
+      return res.status(403).send('Invalid OAuth state.');
     }
-    const user = getUserByLogin(login);
-    if (!user) return res.status(401).json({ error: 'Invalid username or password.' });
+    delete req.session.oauthState;
 
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid username or password.' });
+    // Exchange code for access token
+    const tokenUrl = new URL('https://id.twitch.tv/oauth2/token');
+    tokenUrl.searchParams.set('client_id', config.twitch.clientId);
+    tokenUrl.searchParams.set('client_secret', config.twitch.clientSecret);
+    tokenUrl.searchParams.set('code', code);
+    tokenUrl.searchParams.set('grant_type', 'authorization_code');
+    tokenUrl.searchParams.set('redirect_uri', getUserRedirectUri());
+
+    const tokenRes = await fetch(tokenUrl, { method: 'POST' });
+    if (!tokenRes.ok) {
+      const text = await tokenRes.text();
+      throw new Error(`Token exchange failed (${tokenRes.status}): ${text}`);
+    }
+    const tokenData = await tokenRes.json();
+
+    // Fetch Twitch user profile
+    const userRes = await fetch('https://api.twitch.tv/helix/users', {
+      headers: {
+        'Client-Id': config.twitch.clientId,
+        Authorization: `Bearer ${tokenData.access_token}`
+      }
+    });
+    if (!userRes.ok) throw new Error('Failed to fetch Twitch user info.');
+    const userData = await userRes.json();
+    const twitchUser = userData.data?.[0];
+    if (!twitchUser) throw new Error('No Twitch user data returned.');
+
+    // Create or update local user
+    const user = createOrUpdateTwitchUser({
+      twitchId: twitchUser.id,
+      username: twitchUser.display_name,
+      email: twitchUser.email || null,
+      avatarUrl: twitchUser.profile_image_url || null
+    });
 
     req.session.userId = user.id;
-    const { password_hash, ...safe } = user;
-    res.json({ ok: true, user: safe });
+    res.redirect('/#/dashboard');
   } catch (e) {
-    console.error('[auth] login error:', e);
-    res.status(500).json({ error: 'Login failed.' });
+    console.error('[auth] Twitch callback error:', e?.message || e);
+    res.redirect('/#/login?error=' + encodeURIComponent(e?.message || 'Login failed'));
   }
 });
 
