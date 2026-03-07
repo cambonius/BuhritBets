@@ -1,6 +1,6 @@
 # BuhritBets
 
-A lightweight Node.js + Express web app that lets viewers **bet points on when a Twitch streamer goes live**. It tracks a broadcaster’s live/offline events via Twitch EventSub (WebSocket), and settles bets automatically when the stream goes online.
+A lightweight Node.js + Express web app that lets viewers **bet points on when a Twitch streamer goes live** (though currently just the twitch streamer Buhrito, it will soon have functionality for all other streamers). It tracks a broadcaster’s live/offline events via Twitch EventSub (WebSocket), and settles bets automatically when the stream goes online.
 
 > Tech stack: Node.js (ESM), Express, SQLite (better-sqlite3), vanilla JS SPA + CSS.
 
