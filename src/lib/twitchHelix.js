@@ -60,3 +60,29 @@ export async function helixCreateEventSubSubscription({ config, token, body }) {
   }
   return json;
 }
+
+export async function helixGetModerators({ config, token, broadcasterId }) {
+  let all = [];
+  let cursor = null;
+  do {
+    const query = { broadcaster_id: broadcasterId, first: '100' };
+    if (cursor) query.after = cursor;
+    const json = await helixFetch({ config, token, path: 'moderation/moderators', query });
+    all = all.concat(json.data || []);
+    cursor = json.pagination?.cursor;
+  } while (cursor);
+  return all;
+}
+
+export async function helixGetChannelVips({ config, token, broadcasterId }) {
+  let all = [];
+  let cursor = null;
+  do {
+    const query = { broadcaster_id: broadcasterId, first: '100' };
+    if (cursor) query.after = cursor;
+    const json = await helixFetch({ config, token, path: 'channels/vips', query });
+    all = all.concat(json.data || []);
+    cursor = json.pagination?.cursor;
+  } while (cursor);
+  return all;
+}

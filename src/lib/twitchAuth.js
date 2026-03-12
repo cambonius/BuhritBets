@@ -28,8 +28,8 @@ export function getAuthorizeUrl(config) {
   url.searchParams.set('client_id', config.twitch.clientId);
   url.searchParams.set('redirect_uri', getRedirectUri(config));
   url.searchParams.set('response_type', 'code');
-  // No special scopes needed for stream.online / stream.offline
-  url.searchParams.set('scope', '');
+  // Scopes needed for EventSub + mod/VIP list access
+  url.searchParams.set('scope', 'moderation:read channel:read:vips');
   return url.toString();
 }
 

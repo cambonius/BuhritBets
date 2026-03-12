@@ -157,6 +157,7 @@ const routes = {
   '/profile': pageProfile,
   '/status': pageStatus,
   '/leaderboard': pageLeaderboard,
+  '/settings': pageSettings,
 };
 
 async function router() {
@@ -191,6 +192,7 @@ function renderNav() {
     nav.innerHTML = `
       <a href="#/dashboard" onclick="route(event, '/dashboard')">Dashboard</a>
       <a href="#/leaderboard" onclick="route(event, '/leaderboard')">Leaderboard</a>
+      ${currentUser.is_broadcaster ? '<a href="#/settings" onclick="route(event, \'/settings\')">Settings</a>' : ''}
       <span class="nav-points">🪙 ${currentUser.points.toLocaleString()}</span>
       <button onclick="route(event, '/profile')">${esc(currentUser.username)}</button>
       <button onclick="doLogout()">Log Out</button>
@@ -218,6 +220,9 @@ function renderBottomNav() {
       { icon: '📡', label: 'Status',  path: '/status' },
       { icon: '👤', label: 'Profile', path: '/profile' },
     ];
+    if (currentUser.is_broadcaster) {
+      items.push({ icon: '⚙️', label: 'Settings', path: '/settings' });
+    }
     el.innerHTML = items.map(it => {
       const active = hash === it.path ? ' active' : '';
       const extra = it.cls ? ` ${it.cls}` : '';
@@ -967,7 +972,72 @@ async function pageLeaderboard() {
     $app().innerHTML = `<div class="page container-sm"><div class="empty-state">Failed to load leaderboard.</div></div>`;
   }
 }
+// ── Broadcaster Settings ─────────────────────────────────
+async function pageSettings() {
+  if (!currentUser?.is_broadcaster) return route(null, '/dashboard');
 
+  $app().innerHTML = `<div class="page container-sm"><div class="empty-state"><div class="empty-icon">⚙️</div>Loading settings…</div></div>`;
+
+  try {
+    const data = await api('/api/broadcaster/settings');
+    const settings = data.settings;
+
+    $app().innerHTML = `
+      <div class="page container-sm">
+        <h1 class="t-h1 mb-lg">Stream Settings</h1>
+
+        <div class="card card-padded">
+          <h2 class="t-h3 mb-sm">Betting Permissions</h2>
+          <p class="t-caption mb-lg">Control who can place bets on your stream. As a streamer, you cannot bet on your own stream.</p>
+
+          <div class="setting-row">
+            <div>
+              <div class="t-body"><strong>Allow Moderator Bets</strong></div>
+              <div class="t-caption">Let your channel moderators place bets</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggleMods" ${settings.allow_mod_bets ? 'checked' : ''}>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="t-body"><strong>Allow VIP Bets</strong></div>
+              <div class="t-caption">Let your channel VIPs place bets</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggleVips" ${settings.allow_vip_bets ? 'checked' : ''}>
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+
+    $('#toggleMods').addEventListener('change', async (e) => {
+      try {
+        await api('/api/broadcaster/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ allow_mod_bets: e.target.checked, allow_vip_bets: $('#toggleVips').checked })
+        });
+        toast(e.target.checked ? 'Moderators can now bet' : 'Moderators can no longer bet', 'info');
+      } catch (err) { toast(err.message, 'error'); e.target.checked = !e.target.checked; }
+    });
+
+    $('#toggleVips').addEventListener('change', async (e) => {
+      try {
+        await api('/api/broadcaster/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ allow_mod_bets: $('#toggleMods').checked, allow_vip_bets: e.target.checked })
+        });
+        toast(e.target.checked ? 'VIPs can now bet' : 'VIPs can no longer bet', 'info');
+      } catch (err) { toast(err.message, 'error'); e.target.checked = !e.target.checked; }
+    });
+  } catch (err) {
+    $app().innerHTML = `<div class="page container-sm"><div class="empty-state"><div class="empty-icon">❌</div>${esc(err.message)}</div></div>`;
+  }
+}
 // ═══════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════

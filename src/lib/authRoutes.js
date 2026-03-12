@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { createOrUpdateTwitchUser, getUserById, updateUserAvatar } from './db.js';
 import { config } from './config.js';
+import { isBroadcaster } from './broadcasters.js';
 
 const router = Router();
 
@@ -109,10 +110,12 @@ router.post('/api/auth/logout', (req, res) => {
 });
 
 // ── Current user ─────────────────────────────────────────
-router.get('/api/auth/me', (req, res) => {
+router.get('/api/auth/me', async (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
   const user = getUserById(req.session.userId);
-  res.json({ user: user || null });
+  if (!user) return res.json({ user: null });
+  const is_broadcaster = await isBroadcaster(user.twitch_id);
+  res.json({ user: { ...user, is_broadcaster } });
 });
 
 // ── Avatar upload ────────────────────────────────────────

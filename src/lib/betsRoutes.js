@@ -3,14 +3,18 @@ import { requireAuth } from './authRoutes.js';
 import {
   createBet, matchBet, cancelBet, getBetById,
   listBets, getRecentActivity, getUserTransactions,
-  getLeaderboard, getUserById
+  getLeaderboard, getUserById, getBroadcasterSettings, upsertBroadcasterSettings
 } from './db.js';
+import { canUserBet, isBroadcaster, getResolvedBroadcasterIds } from './broadcasters.js';
 
 const router = Router();
 
 // ── Create bet ───────────────────────────────────────────
-router.post('/api/bets', requireAuth, (req, res) => {
+router.post('/api/bets', requireAuth, async (req, res) => {
   try {
+    const check = await canUserBet(req.session.userId);
+    if (!check.allowed) return res.status(403).json({ error: check.reason });
+
     const { condition, targetTime, stake, note, title } = req.body;
     if (!condition || !targetTime || !stake) {
       return res.status(400).json({ error: 'Condition, targetTime, and stake are required.' });
@@ -41,8 +45,11 @@ router.post('/api/bets', requireAuth, (req, res) => {
 });
 
 // ── Match bet ────────────────────────────────────────────
-router.post('/api/bets/:id/match', requireAuth, (req, res) => {
+router.post('/api/bets/:id/match', requireAuth, async (req, res) => {
   try {
+    const check = await canUserBet(req.session.userId);
+    if (!check.allowed) return res.status(403).json({ error: check.reason });
+
     const bet = matchBet(Number(req.params.id), req.session.userId);
     res.json({ ok: true, bet });
   } catch (e) {
@@ -109,6 +116,37 @@ router.get('/api/me/transactions', requireAuth, (req, res) => {
 router.get('/api/leaderboard', (req, res) => {
   const leaders = getLeaderboard(Number(req.query.limit) || 20);
   res.json({ leaderboard: leaders });
+});
+
+// ── Broadcaster settings ─────────────────────────────────
+router.get('/api/broadcaster/settings', requireAuth, async (req, res) => {
+  try {
+    const user = getUserById(req.session.userId);
+    if (!user?.twitch_id || !(await isBroadcaster(user.twitch_id))) {
+      return res.status(403).json({ error: 'Only broadcasters can access settings.' });
+    }
+    const settings = getBroadcasterSettings(user.twitch_id);
+    res.json({ settings: { allow_mod_bets: !!settings.allow_mod_bets, allow_vip_bets: !!settings.allow_vip_bets } });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load settings.' });
+  }
+});
+
+router.put('/api/broadcaster/settings', requireAuth, async (req, res) => {
+  try {
+    const user = getUserById(req.session.userId);
+    if (!user?.twitch_id || !(await isBroadcaster(user.twitch_id))) {
+      return res.status(403).json({ error: 'Only broadcasters can change settings.' });
+    }
+    const { allow_mod_bets, allow_vip_bets } = req.body;
+    const settings = upsertBroadcasterSettings(user.twitch_id, {
+      allowModBets: allow_mod_bets,
+      allowVipBets: allow_vip_bets
+    });
+    res.json({ ok: true, settings: { allow_mod_bets: !!settings.allow_mod_bets, allow_vip_bets: !!settings.allow_vip_bets } });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update settings.' });
+  }
 });
 
 export default router;

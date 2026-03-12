@@ -58,6 +58,12 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_bets_creator ON bets(creator_id);
     CREATE INDEX IF NOT EXISTS idx_bets_opponent ON bets(opponent_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
+
+    CREATE TABLE IF NOT EXISTS broadcaster_settings (
+      twitch_id TEXT PRIMARY KEY,
+      allow_mod_bets INTEGER NOT NULL DEFAULT 1,
+      allow_vip_bets INTEGER NOT NULL DEFAULT 1
+    );
   `);
 
   // ── Migrations for existing databases ──────────────────
@@ -71,7 +77,8 @@ function initSchema(db) {
     db.exec("ALTER TABLE users ADD COLUMN avatar_path TEXT");
   }
   if (!userCols.includes('twitch_id')) {
-    db.exec("ALTER TABLE users ADD COLUMN twitch_id TEXT UNIQUE");
+    db.exec("ALTER TABLE users ADD COLUMN twitch_id TEXT");
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_twitch_id ON users(twitch_id)");
   }
 }
 
@@ -298,4 +305,23 @@ export function getLeaderboard(limit = 20) {
   return getDb().prepare(`
     SELECT id, username, points, avatar_path, created_at FROM users ORDER BY points DESC LIMIT ?
   `).all(limit);
+}
+
+// ── Broadcaster settings helpers ─────────────────────────
+
+export function getBroadcasterSettings(twitchId) {
+  const row = getDb().prepare('SELECT * FROM broadcaster_settings WHERE twitch_id = ?').get(twitchId);
+  return row || { twitch_id: twitchId, allow_mod_bets: 1, allow_vip_bets: 1 };
+}
+
+export function upsertBroadcasterSettings(twitchId, { allowModBets, allowVipBets }) {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO broadcaster_settings (twitch_id, allow_mod_bets, allow_vip_bets)
+    VALUES (?, ?, ?)
+    ON CONFLICT(twitch_id) DO UPDATE SET
+      allow_mod_bets = excluded.allow_mod_bets,
+      allow_vip_bets = excluded.allow_vip_bets
+  `).run(twitchId, allowModBets ? 1 : 0, allowVipBets ? 1 : 0);
+  return getBroadcasterSettings(twitchId);
 }
